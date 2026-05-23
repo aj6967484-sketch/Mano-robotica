@@ -2,50 +2,49 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Real Hand Tracking</title>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands"></script>
+  <title>AR Realista</title>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils"></script>
   <style>
     body { margin: 0; background: #000; overflow: hidden; }
-    #video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
-    canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+    #video { position: absolute; width: 100%; height: 100%; object-fit: cover; }
+    #canvas { position: absolute; width: 100%; height: 100%; }
+    #btn { position: absolute; bottom: 30px; right: 30px; padding: 20px; background: #00f2fe; border-radius: 50%; border: none; font-size: 20px; z-index: 10; }
   </style>
 </head>
 <body>
   <video id="video" autoplay playsinline></video>
   <canvas id="canvas"></canvas>
-
+  <button id="btn">🔄</button>
   <script>
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
-    const hands = new Hands({locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
-    hands.setOptions({maxNumHands: 1, modelComplexity: 1});
+    const video = document.getElementById('video');
+    let useFront = true;
 
-    hands.onResults(results => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+    const pose = new Pose({locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`});
+    pose.onResults(res => {
+      canvas.width = window.innerWidth; canvas.height = window.innerHeight;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
-      if(results.multiHandLandmarks) {
-        // Dibujo de mano estilizada (estilo VR fluido)
-        ctx.strokeStyle = '#00f2fe';
-        ctx.lineWidth = 10;
-        ctx.lineCap = 'round';
-        results.multiHandLandmarks.forEach(landmarks => {
-          // Conectar puntos de la mano para que se vea fluida
-          ctx.beginPath();
-          landmarks.forEach((lm, i) => {
-            const x = (1 - lm.x) * canvas.width;
-            const y = lm.y * canvas.height;
-            if(i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-          });
-          ctx.stroke();
+      if(res.poseLandmarks) {
+        ctx.strokeStyle = '#00f2fe'; ctx.lineWidth = 12; ctx.lineCap = 'round';
+        ctx.beginPath();
+        // Dibujamos solo los puntos clave del brazo (Hombro -> Codo -> Muñeca -> Dedos)
+        const arm = [11, 13, 15, 17, 19]; 
+        arm.forEach((idx, i) => {
+          const x = res.poseLandmarks[idx].x * canvas.width;
+          const y = res.poseLandmarks[idx].y * canvas.height;
+          if(i===0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
         });
+        ctx.stroke();
       }
     });
 
-    const video = document.getElementById('video');
-    new Camera(video, {onFrame: async() => await hands.send({image: video})}).start();
+    function startCam() {
+      new Camera(video, {onFrame: async() => await pose.send({image: video}), facingMode: useFront ? "user" : "environment"}).start();
+    }
+    document.getElementById('btn').onclick = () => { useFront = !useFront; startCam(); };
+    startCam();
   </script>
 </body>
 </html>
