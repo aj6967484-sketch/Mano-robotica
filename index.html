@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Cyber Espadachín VR</title>
+  <title>Cyber-Zombie Slayer VR</title>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -17,63 +17,42 @@
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    // Espada Laser
-    const sword = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.05, 2), new THREE.MeshBasicMaterial({color: 0x00f2fe}));
-    sword.rotation.x = Math.PI/2;
+    // Mesa y Espadas
+    const table = new THREE.Mesh(new THREE.BoxGeometry(4, 0.5, 2), new THREE.MeshBasicMaterial({color: 0x333333}));
+    table.position.y = -2; scene.add(table);
+    const sword = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2), new THREE.MeshBasicMaterial({color: 0x00f2fe}));
     scene.add(sword);
 
-    // Enemigos (Esferas)
-    const enemies = [];
-    for(let i=0; i<3; i++) {
-      const e = new THREE.Mesh(new THREE.SphereGeometry(0.3), new THREE.MeshBasicMaterial({color: 0xff0000}));
-      e.position.set(Math.random()*4-2, Math.random()*4-2, -2);
-      scene.add(e); enemies.push(e);
+    // Zombies (Esferas con contador de vida)
+    const zombies = [];
+    function spawnZombie() {
+      const z = new THREE.Mesh(new THREE.SphereGeometry(0.4), new THREE.MeshBasicMaterial({color: 0x00ff00}));
+      z.position.set(Math.random()*6-3, Math.random()*4-2, -3);
+      z.userData = {hp: 2}; // Vida: dos golpes
+      scene.add(z); zombies.push(z);
     }
+    for(let i=0; i<3; i++) spawnZombie();
 
     const hands = new Hands({locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
-    hands.setOptions({maxNumHands: 1, modelComplexity: 0}); // Complejidad 0 = Súper rápido sin lag
+    hands.setOptions({maxNumHands: 1, modelComplexity: 0});
     
     hands.onResults(results => {
       if(results.multiHandLandmarks) {
-        const finger = results.multiHandLandmarks[0][8];
-        const x = (finger.x-0.5)*-10;
-        const y = (finger.y-0.5)*-10;
-        sword.position.set(x, y, 0);
+        const indexTip = results.multiHandLandmarks[0][8];
+        sword.position.set((indexTip.x-0.5)*-10, (indexTip.y-0.5)*-10, 0);
         
-        // Detección de colisión (matar enemigo)
-        enemies.forEach(e => {
-          if(sword.position.distanceTo(e.position) < 0.5) e.position.set(10,10,10);
+        zombies.forEach((z, i) => {
+          if(sword.position.distanceTo(z.position) < 0.6) {
+            z.userData.hp--;
+            z.material.color.set(0xff0000); // Se pone rojo al golpe
+            if(z.userData.hp <= 0) { scene.remove(z); zombies.splice(i, 1); setTimeout(spawnZombie, 2000); }
+          }
         });
       }
     });
 
     const v = document.createElement('video');
-    v.style.display = 'none'; document.body.appendChild(v);
-    navigator.mediaDevices.getUserMedia({video: true}).then(s => {
-      v.srcObject = s;
-      new Camera(v, {onFrame: async() => await hands.send({image: v})}).start();
-    });
-
-    function animate() {
-      requestAnimationFrame(animate);
-      renderer.render(scene, camera);
-    }
-    animate();
-  </script>
-</body>
-</html>
-// Mover el cubo a la posición de la mano
-        cube.position.set((indexTip.x-0.5)*-12, (indexTip.y-0.5)*-12, indexTip.z*-10);
-        
-        // Detectar si el puño está cerrado (distancia índice-pulgar)
-        const d = Math.hypot(hand[8].x - hand[4].x, hand[8].y - hand[4].y);
-        cube.material.color.set(d < 0.05 ? 0xff0000 : 0x00ff00); // Rojo si cierras, Verde si abres
-        cube.rotation.y += 0.05;
-      }
-    });
-
-    const video = document.getElementById('video');
-    new Camera(video, {onFrame: async() => await hands.send({image: video})}).start();
+    navigator.mediaDevices.getUserMedia({video: true}).then(s => { v.srcObject = s; new Camera(v, {onFrame: async() => await hands.send({image: v})}).start(); });
 
     function animate() {
       requestAnimationFrame(animate);
