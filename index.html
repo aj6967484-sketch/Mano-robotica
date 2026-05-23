@@ -2,65 +2,65 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Simulador Mano Robótica 3D</title>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  <title>Dual Cyber Hand 3D</title>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <style>
-    body { margin: 0; background: #050508; color: #fff; font-family: sans-serif; overflow: hidden; }
-    #UI { position: absolute; top: 20px; width: 100%; text-align: center; pointer-events: none; }
-    #camera_container { position: absolute; bottom: 20px; left: 20px; width: 120px; height: 90px; border: 2px solid #00f2fe; border-radius: 8px; overflow: hidden; }
-    video { transform: scaleX(-1); width: 100%; height: 100%; object-fit: cover; }
+    body { margin: 0; background: #000; overflow: hidden; }
     canvas { display: block; }
+    #video { position: absolute; top: 0; left: 0; width: 100px; opacity: 0.3; }
   </style>
 </head>
 <body>
-  <div id="UI"><h1>CYBER HAND 3D</h1><div id="status">Iniciando...</div></div>
-  <div id="camera_container"><video id="webcam" autoplay playsinline></video></div>
-  <canvas id="canvas3d"></canvas>
-
+  <video id="video" autoplay playsinline></video>
   <script>
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
-    camera.position.z = 15;
-    const renderer = new THREE.WebGLRenderer({canvas: document.getElementById('canvas3d'), antialias: true});
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+    camera.position.z = 10;
+    const renderer = new THREE.WebGLRenderer({antialias: true});
     renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
 
-    // Luces
-    scene.add(new THREE.AmbientLight(0x404040));
-    const light = new THREE.PointLight(0x00f2fe, 2, 50);
-    light.position.set(5,5,10);
+    // Luces para efecto "Realista"
+    scene.add(new THREE.AmbientLight(0x444444));
+    const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.position.set(1, 1, 1);
     scene.add(light);
 
-    // Objetos 3D básicos
-    const handGroup = new THREE.Group();
-    scene.add(handGroup);
-    const geometry = new THREE.SphereGeometry(0.3, 16, 16);
-    const material = new THREE.MeshPhongMaterial({color: 0xff0055});
-    const joints = [];
-    for(let i=0; i<21; i++) {
-      const mesh = new THREE.Mesh(geometry, material);
-      handGroup.add(mesh);
-      joints.push(mesh);
+    // Crear dos manos (grupos 3D)
+    const hands3D = [new THREE.Group(), new THREE.Group()];
+    hands3D.forEach(h => scene.add(h));
+    
+    // Función para crear esferas (articulaciones)
+    function createHand(group) {
+      for(let i=0; i<21; i++) {
+        const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.2), new THREE.MeshPhongMaterial({color: 0xcccccc}));
+        group.add(mesh);
+      }
     }
+    createHand(hands3D[0]);
+    createHand(hands3D[1]);
 
-    const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-    hands.setOptions({maxNumHands: 1, modelComplexity: 1});
+    const hands = new Hands({locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
+    hands.setOptions({maxNumHands: 2, modelComplexity: 1}); // maxNumHands: 2 activado
+    
     hands.onResults(results => {
+      hands3D[0].visible = false;
+      hands3D[1].visible = false;
+      
       if(results.multiHandLandmarks) {
-        const lms = results.multiHandLandmarks[0];
-        lms.forEach((lm, i) => {
-          joints[i].position.set((lm.x-0.5)*-12, (lm.y-0.5)*-12, (lm.z)*-12);
+        results.multiHandLandmarks.forEach((landmarks, hIdx) => {
+          hands3D[hIdx].visible = true;
+          landmarks.forEach((lm, i) => {
+            hands3D[hIdx].children[i].position.set((lm.x-0.5)*-15, (lm.y-0.5)*-15, lm.z*-10);
+          });
         });
       }
     });
 
-    const video = document.getElementById('webcam');
-    navigator.mediaDevices.getUserMedia({video: true}).then(s => {
-      video.srcObject = s;
-      new Camera(video, {onFrame: async() => await hands.send({image: video})}).start();
-    });
+    const video = document.getElementById('video');
+    new Camera(video, {onFrame: async() => await hands.send({image: video})}).start();
 
     function animate() {
       requestAnimationFrame(animate);
