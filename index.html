@@ -2,13 +2,14 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Cyber-Zombie Slayer VR</title>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands"></script>
+  <title>Full Body VR Slayer</title>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <style> body { margin: 0; background: #000; overflow: hidden; } </style>
+  <style> body { margin: 0; background: #000; overflow: hidden; } #ui { position: absolute; color: #0f0; font-family: monospace; padding: 20px; } </style>
 </head>
 <body>
+  <div id="ui">VIDA VR: <span id="health">100%</span></div>
   <script>
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
@@ -17,42 +18,25 @@
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    // Mesa y Espadas
-    const table = new THREE.Mesh(new THREE.BoxGeometry(4, 0.5, 2), new THREE.MeshBasicMaterial({color: 0x333333}));
-    table.position.y = -2; scene.add(table);
-    const sword = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2), new THREE.MeshBasicMaterial({color: 0x00f2fe}));
-    scene.add(sword);
+    // Pistola (controlada por la mano derecha)
+    const gun = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.8), new THREE.MeshBasicMaterial({color: 0xffffff}));
+    scene.add(gun);
 
-    // Zombies (Esferas con contador de vida)
-    const zombies = [];
-    function spawnZombie() {
-      const z = new THREE.Mesh(new THREE.SphereGeometry(0.4), new THREE.MeshBasicMaterial({color: 0x00ff00}));
-      z.position.set(Math.random()*6-3, Math.random()*4-2, -3);
-      z.userData = {hp: 2}; // Vida: dos golpes
-      scene.add(z); zombies.push(z);
-    }
-    for(let i=0; i<3; i++) spawnZombie();
-
-    const hands = new Hands({locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
-    hands.setOptions({maxNumHands: 1, modelComplexity: 0});
+    // Sistema de Pose (Cuerpo completo)
+    const pose = new Pose({locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`});
+    pose.setOptions({modelComplexity: 1, minDetectionConfidence: 0.5});
     
-    hands.onResults(results => {
-      if(results.multiHandLandmarks) {
-        const indexTip = results.multiHandLandmarks[0][8];
-        sword.position.set((indexTip.x-0.5)*-10, (indexTip.y-0.5)*-10, 0);
-        
-        zombies.forEach((z, i) => {
-          if(sword.position.distanceTo(z.position) < 0.6) {
-            z.userData.hp--;
-            z.material.color.set(0xff0000); // Se pone rojo al golpe
-            if(z.userData.hp <= 0) { scene.remove(z); zombies.splice(i, 1); setTimeout(spawnZombie, 2000); }
-          }
-        });
+    pose.onResults(results => {
+      if(results.poseLandmarks) {
+        // Mover la pistola con la mano derecha (landmark 16)
+        const rightHand = results.poseLandmarks[16];
+        gun.position.set((rightHand.x-0.5)*-10, (rightHand.y-0.5)*-10, 0);
       }
     });
 
+    // Iniciar cámara
     const v = document.createElement('video');
-    navigator.mediaDevices.getUserMedia({video: true}).then(s => { v.srcObject = s; new Camera(v, {onFrame: async() => await hands.send({image: v})}).start(); });
+    navigator.mediaDevices.getUserMedia({video: true}).then(s => { v.srcObject = s; new Camera(v, {onFrame: async() => await pose.send({image: v})}).start(); });
 
     function animate() {
       requestAnimationFrame(animate);
@@ -62,3 +46,4 @@
   </script>
 </body>
 </html>
+
