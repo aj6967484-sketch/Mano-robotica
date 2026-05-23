@@ -3,199 +3,70 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Simulador de Mano Robótica</title>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
-  
+  <title>Simulador Mano Robótica 3D</title>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <style>
-    body { 
-      margin: 0; 
-      font-family: 'Segoe UI', Arial, sans-serif; 
-      background-color: #0d0e15; 
-      color: white; 
-      text-align: center; 
-      overflow: hidden;
-      height: 100vh;
-    }
-    
-    #UI {
-      position: absolute;
-      top: 15px;
-      width: 100%;
-      z-index: 10;
-    }
-
-    h1 { margin: 0; font-size: 24px; color: #00f2fe; text-shadow: 0 0 10px rgba(0,242,254,0.6); }
-    #status { font-size: 14px; color: #aaa; margin-top: 5px; font-weight: bold; }
-
-    #camera_container { 
-      position: absolute; 
-      bottom: 15px; 
-      left: 15px; 
-      width: 110px; 
-      height: 82px; 
-      border-radius: 8px;
-      overflow: hidden;
-      border: 2px solid #00f2fe;
-      z-index: 5;
-      box-shadow: 0 0 10px rgba(0,242,254,0.3);
-    }
+    body { margin: 0; background: #050508; color: #fff; font-family: sans-serif; overflow: hidden; }
+    #UI { position: absolute; top: 20px; width: 100%; text-align: center; pointer-events: none; }
+    #camera_container { position: absolute; bottom: 20px; left: 20px; width: 120px; height: 90px; border: 2px solid #00f2fe; border-radius: 8px; overflow: hidden; }
     video { transform: scaleX(-1); width: 100%; height: 100%; object-fit: cover; }
-
-    #stage {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      width: 100vw;
-      height: 100vh;
-      background: radial-gradient(circle, #1c1d3a 0%, #07080c 100%);
-    }
-
-    .robotic-hand {
-      position: relative;
-      width: 280px;
-      height: 400px;
-    }
-
-    .palm {
-      position: absolute;
-      bottom: 20px;
-      left: 40px;
-      width: 200px;
-      height: 160px;
-      background: linear-gradient(135deg, #23273a, #151824);
-      border: 4px solid #00f2fe;
-      border-radius: 20px 20px 40px 40px;
-      box-shadow: 0 0 30px rgba(0, 242, 254, 0.2), inset 0 0 15px rgba(0, 242, 254, 0.3);
-    }
-
-    .palm::after {
-      content: '';
-      position: absolute;
-      top: 30%; left: 15%; width: 70%; height: 40%;
-      border-left: 3px solid #ff0050;
-      border-bottom: 3px solid #ff0050;
-      opacity: 0.7;
-    }
-
-    .finger {
-      position: absolute;
-      width: 32px;
-      height: 130px;
-      background: #1f2336;
-      border: 3px solid #00f2fe;
-      border-radius: 16px;
-      bottom: 165px;
-      transform-origin: bottom center;
-      transition: transform 0.1s ease-out, background-color 0.1s;
-      box-shadow: 0 0 15px rgba(0, 242, 254, 0.1);
-    }
-
-    .finger::before {
-      content: '';
-      position: absolute;
-      top: 15px; left: 4px; right: 4px; height: 35px;
-      background: #2a2f4a;
-      border-radius: 10px;
-      border-bottom: 2px solid #00f2fe;
-    }
-    
-    .finger::after {
-      content: '';
-      position: absolute;
-      top: 60px; left: 4px; right: 4px; height: 35px;
-      background: #2a2f4a;
-      border-radius: 10px;
-      border-bottom: 2px solid #ff0050;
-    }
-
-    #thumb  { left: 15px;  bottom: 90px; height: 100px; transform-origin: bottom right; transform: rotate(-35deg); }
-    #index  { left: 50px;  height: 140px; }
-    #middle { left: 95px;  height: 155px; }
-    #ring   { left: 140px; height: 145px; }
-    #pinky  { left: 185px; height: 120px; }
+    canvas { display: block; }
   </style>
 </head>
 <body>
-
-  <div id="UI">
-    <h1>MANO ROBÓTICA ONLINE</h1>
-    <div id="status">Por favor, permite el acceso a la cámara...</div>
-  </div>
-
-  <div id="camera_container">
-    <video id="webcam" autoplay playsinline></video>
-  </div>
-
-  <div id="stage">
-    <div class="robotic-hand">
-      <div id="thumb" class="finger"></div>
-      <div id="index" class="finger"></div>
-      <div id="middle" class="finger"></div>
-      <div id="ring" class="finger"></div>
-      <div id="pinky" class="finger"></div>
-      <div class="palm"></div>
-    </div>
-  </div>
+  <div id="UI"><h1>CYBER HAND 3D</h1><div id="status">Iniciando...</div></div>
+  <div id="camera_container"><video id="webcam" autoplay playsinline></video></div>
+  <canvas id="canvas3d"></canvas>
 
   <script>
-    const videoElement = document.getElementById('webcam');
-    const statusBox = document.getElementById('status');
-    
-    const fThumb = document.getElementById('thumb');
-    const fIndex = document.getElementById('index');
-    const fMiddle = document.getElementById('middle');
-    const fRing = document.getElementById('ring');
-    const fPinky = document.getElementById('pinky');
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
+    camera.position.z = 15;
+    const renderer = new THREE.WebGLRenderer({canvas: document.getElementById('canvas3d'), antialias: true});
+    renderer.setSize(window.innerWidth, window.innerHeight);
 
-    function onResults(results) {
-      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-        statusBox.innerHTML = "🤖 Sincronizado. Mueve tus dedos";
-        statusBox.style.color = "#00FFCC";
+    // Luces
+    scene.add(new THREE.AmbientLight(0x404040));
+    const light = new THREE.PointLight(0x00f2fe, 2, 50);
+    light.position.set(5,5,10);
+    scene.add(light);
 
-        const landmarks = results.multiHandLandmarks[0];
-
-        if (landmarks[8].y > landmarks[6].y) { fIndex.style.transform = "scaleY(0.35)"; fIndex.style.backgroundColor = "#ff0050"; }
-        else { fIndex.style.transform = "scaleY(1)"; fIndex.style.backgroundColor = "#1f2336"; }
-
-        if (landmarks[12].y > landmarks[10].y) { fMiddle.style.transform = "scaleY(0.35)"; fMiddle.style.backgroundColor = "#ff0050"; }
-        else { fMiddle.style.transform = "scaleY(1)"; fMiddle.style.backgroundColor = "#1f2336"; }
-
-        if (landmarks[16].y > landmarks[14].y) { fRing.style.transform = "scaleY(0.35)"; fRing.style.backgroundColor = "#ff0050"; }
-        else { fRing.style.transform = "scaleY(1)"; fRing.style.backgroundColor = "#1f2336"; }
-
-        if (landmarks[20].y > landmarks[18].y) { fPinky.style.transform = "scaleY(0.35)"; fPinky.style.backgroundColor = "#ff0050"; }
-        else { fPinky.style.transform = "scaleY(1)"; fPinky.style.backgroundColor = "#1f2336"; }
-
-        if (Math.abs(landmarks[4].x - landmarks[17].x) < Math.abs(landmarks[2].x - landmarks[17].x)) {
-          fThumb.style.transform = "rotate(-35deg) scale(0.5)"; fThumb.style.backgroundColor = "#ff0050";
-        } else {
-          fThumb.style.transform = "rotate(-35deg) scale(1)"; fThumb.style.backgroundColor = "#1f2336";
-        }
-      } else {
-        statusBox.innerHTML = "👋 Coloca tu mano frente a la cámara...";
-        statusBox.style.color = "#00f2fe";
-      }
+    // Objetos 3D básicos
+    const handGroup = new THREE.Group();
+    scene.add(handGroup);
+    const geometry = new THREE.SphereGeometry(0.3, 16, 16);
+    const material = new THREE.MeshPhongMaterial({color: 0xff0055});
+    const joints = [];
+    for(let i=0; i<21; i++) {
+      const mesh = new THREE.Mesh(geometry, material);
+      handGroup.add(mesh);
+      joints.push(mesh);
     }
 
     const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-    hands.setOptions({ maxNumHands: 1, modelComplexity: 0, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
-    hands.onResults(onResults);
-
-    navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "user", width: 320, height: 240 }
-    }).then(stream => {
-      videoElement.srcObject = stream;
-      const camera = new Camera(videoElement, {
-        onFrame: async () => { await hands.send({image: videoElement}); },
-        width: 320,
-        height: 240
-      });
-      camera.start();
-    }).catch(err => {
-      statusBox.innerHTML = "❌ Activa los permisos de la cámara en tu navegador.";
-      statusBox.style.color = "#ff0050";
+    hands.setOptions({maxNumHands: 1, modelComplexity: 1});
+    hands.onResults(results => {
+      if(results.multiHandLandmarks) {
+        const lms = results.multiHandLandmarks[0];
+        lms.forEach((lm, i) => {
+          joints[i].position.set((lm.x-0.5)*-12, (lm.y-0.5)*-12, (lm.z)*-12);
+        });
+      }
     });
+
+    const video = document.getElementById('webcam');
+    navigator.mediaDevices.getUserMedia({video: true}).then(s => {
+      video.srcObject = s;
+      new Camera(video, {onFrame: async() => await hands.send({image: video})}).start();
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+      renderer.render(scene, camera);
+    }
+    animate();
   </script>
 </body>
 </html>
