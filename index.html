@@ -2,48 +2,61 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Full Body VR Slayer</title>
+  <title>Cyber-Slayer Pro</title>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <style> body { margin: 0; background: #000; overflow: hidden; } #ui { position: absolute; color: #0f0; font-family: monospace; padding: 20px; } </style>
+  <style> 
+    body { margin: 0; background: #000; overflow: hidden; } 
+    canvas { display: block; width: 100vw; height: 100vh; }
+    #ui { position: absolute; top: 10px; left: 10px; color: #fff; font-family: sans-serif; }
+  </style>
 </head>
 <body>
-  <div id="ui">VIDA VR: <span id="health">100%</span></div>
+  <div id="ui">ZOMBIES RESTANTES: <span id="count">3</span></div>
+  <canvas id="gameCanvas"></canvas>
+
   <script>
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-    camera.position.z = 5;
-    const renderer = new THREE.WebGLRenderer();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth; canvas.height = window.innerHeight;
 
-    // Pistola (controlada por la mano derecha)
-    const gun = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.8), new THREE.MeshBasicMaterial({color: 0xffffff}));
-    scene.add(gun);
+    let playerX = 0, playerY = 0;
+    const enemies = [{x: 100, y: 100}, {x: 300, y: 200}, {x: 200, y: 400}];
 
-    // Sistema de Pose (Cuerpo completo)
     const pose = new Pose({locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`});
     pose.setOptions({modelComplexity: 1, minDetectionConfidence: 0.5});
     
     pose.onResults(results => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
       if(results.poseLandmarks) {
-        // Mover la pistola con la mano derecha (landmark 16)
-        const rightHand = results.poseLandmarks[16];
-        gun.position.set((rightHand.x-0.5)*-10, (rightHand.y-0.5)*-10, 0);
+        const hand = results.poseLandmarks[16]; // Mano derecha
+        playerX = hand.x * canvas.width;
+        playerY = hand.y * canvas.height;
       }
+
+      // Dibujar Espada Realista (Forma de diamante/filo)
+      ctx.strokeStyle = '#00f2fe';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(playerX, playerY);
+      ctx.lineTo(playerX + 50, playerY - 150); // Filo de la espada
+      ctx.stroke();
+
+      // Dibujar Zombies
+      enemies.forEach((e, i) => {
+        ctx.fillStyle = 'red';
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, 30, 0, Math.PI*2);
+        ctx.fill();
+        // Colisión
+        if(Math.hypot(playerX - e.x, playerY - e.y) < 50) enemies.splice(i, 1);
+      });
+      document.getElementById('count').innerText = enemies.length;
     });
 
-    // Iniciar cámara
     const v = document.createElement('video');
     navigator.mediaDevices.getUserMedia({video: true}).then(s => { v.srcObject = s; new Camera(v, {onFrame: async() => await pose.send({image: v})}).start(); });
-
-    function animate() {
-      requestAnimationFrame(animate);
-      renderer.render(scene, camera);
-    }
-    animate();
   </script>
 </body>
 </html>
-
